@@ -7,7 +7,13 @@
     <groupId>org.eina.r-informacion</groupId>
     <artifactId>r-informacion</artifactId>
     <version>1.0-SNAPSHOT</version>
-
+    <dependencies>
+        <dependency>
+            <groupId>org.apache.lucene</groupId>
+            <artifactId>lucene-core</artifactId>
+            <version>7.5.0</version>
+        </dependency>
+    </dependencies>
 
 
 
