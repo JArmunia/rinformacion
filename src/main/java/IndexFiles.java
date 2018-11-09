@@ -18,6 +18,7 @@
  */
 
 import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.miscellaneous.PerFieldAnalyzerWrapper;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
@@ -30,26 +31,39 @@ import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.nio.file.Paths;
-import java.util.Date;
-import org.apache.lucene.analysis.es.SpanishAnalyzer;
 
-/** Index all text files under a directory.
+import java.io.*;
+import java.nio.file.Paths;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.apache.lucene.analysis.es.SpanishAnalyzer;
+import org.w3c.dom.NamedNodeMap;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
+
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+
+/**
+ * Index all text files under a directory.
  * <p>
  * This is a command-line application demonstrating simple Lucene indexing.
  * Run it with no command-line arguments for usage information.
  */
 public class IndexFiles {
 
-    private IndexFiles() {}
+    private IndexFiles() {
+    }
 
-    /** Index all text files under a directory. */
+    /**
+     * Index all text files under a directory.
+     */
     public static void main(String[] args) {
         String usage = "java org.apache.lucene.demo.IndexFiles"
                 + " [-index INDEX_PATH] [-docs DOCS_PATH] [-update]\n\n"
@@ -58,12 +72,12 @@ public class IndexFiles {
         String indexPath = "index";
         String docsPath = null;
         boolean create = true;
-        for(int i=0;i<args.length;i++) {
+        for (int i = 0; i < args.length; i++) {
             if ("-index".equals(args[i])) {
-                indexPath = args[i+1];
+                indexPath = args[i + 1];
                 i++;
             } else if ("-docs".equals(args[i])) {
-                docsPath = args[i+1];
+                docsPath = args[i + 1];
                 i++;
             } else if ("-update".equals(args[i])) {
                 create = false;
@@ -77,7 +91,7 @@ public class IndexFiles {
 
         final File docDir = new File(docsPath);
         if (!docDir.exists() || !docDir.canRead()) {
-            System.out.println("Document directory '" +docDir.getAbsolutePath()+ "' does not exist or is not readable, please check the path");
+            System.out.println("Document directory '" + docDir.getAbsolutePath() + "' does not exist or is not readable, please check the path");
             System.exit(1);
         }
 
@@ -86,7 +100,13 @@ public class IndexFiles {
             System.out.println("Indexing to directory '" + indexPath + "'...");
 
             Directory dir = FSDirectory.open(Paths.get(indexPath));
-            Analyzer analyzer = new StandardAnalyzer();
+            Map<String, Analyzer> analyzerMap = new HashMap<>();
+            analyzerMap.put("creator", new AnalizadorAutores());
+            analyzerMap.put("title", new AnalizadorTexto());
+            analyzerMap.put("subject", new AnalizadorTexto());
+            analyzerMap.put("description", new AnalizadorTexto());
+
+            PerFieldAnalyzerWrapper analyzer = new PerFieldAnalyzerWrapper(new StandardAnalyzer(), analyzerMap);
             IndexWriterConfig iwc = new IndexWriterConfig(analyzer);
 
             if (create) {
@@ -127,10 +147,29 @@ public class IndexFiles {
         }
     }
 
+
+    private static String obtenerEtiqueta(org.w3c.dom.Document parserXML, String etiqueta) {
+        NodeList nl = parserXML.getElementsByTagName(etiqueta);
+        StringBuffer result = new StringBuffer();
+        for (int i = 0; i < nl.getLength(); ++i) {
+            NodeList nl2 = nl.item(i).getChildNodes();
+            for (int j = 0; j < nl2.getLength(); j++) {
+                Node subnode = nl2.item(j);
+                result.append(subnode.getNodeValue());
+
+            }
+            result.append(" ");
+
+        }
+
+        System.out.println(result);
+        return result.toString();
+    }
+
     /**
      * Indexes the given file using the given writer, or if a directory is given,
      * recurses over files and directories found under the given directory.
-     *
+     * <p>
      * NOTE: This method indexes one document per input file.  This is slow.  For good
      * throughput, put multiple documents into your input file(s).  An example of this is
      * in the benchmark module, which can create "line doc" files, one document per line,
@@ -139,7 +178,7 @@ public class IndexFiles {
      * >WriteLineDocTask</a>.
      *
      * @param writer Writer to the index where the given file/dir info will be stored
-     * @param file The file to index, or the directory to recurse into to find files to index
+     * @param file   The file to index, or the directory to recurse into to find files to index
      * @throws IOException If there is a low-level I/O error
      */
     static void indexDocs(IndexWriter writer, File file)
@@ -167,6 +206,12 @@ public class IndexFiles {
 
                 try {
 
+                    DocumentBuilderFactory aux = DocumentBuilderFactory.newInstance();
+                    DocumentBuilder parseador = aux.newDocumentBuilder();
+
+                    org.w3c.dom.Document document = parseador.parse(file);
+                    //System.out.println(parserXML.toString());
+
                     // make a new, empty document
                     Document doc = new Document();
 
@@ -177,6 +222,19 @@ public class IndexFiles {
                     Field pathField = new StringField("path", file.getPath(), Field.Store.YES);
                     doc.add(pathField);
 
+
+//                    SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
+//                    Field lastDate =
+//                            new StringField(
+//                                    "lastDate",
+//                                    sdf.format(file.lastModified()),
+//                                    Field.Store.YES);
+//
+//                    doc.add(lastDate);
+
+                    //NamedNodeMap etiquetasXML = parserXML.getAttributes();
+
+
                     // Add the last modified date of the file a field named "modified".
                     // Use a LongField that is indexed (i.e. efficiently filterable with
                     // NumericRangeFilter).  This indexes to milli-second resolution, which
@@ -184,13 +242,176 @@ public class IndexFiles {
                     // year/month/day/hour/minutes/seconds, down the resolution you require.
                     // For example the long value 2011021714 would mean
                     // February 17, 2011, 2-3 PM.
-                    doc.add(new LongPoint("modified", file.lastModified()));
+                    //doc.add(new LongPoint("modified", file.lastModified()));
 
                     // Add the contents of the file to a field named "contents".  Specify a Reader,
                     // so that the text of the file is tokenized and indexed, but not stored.
                     // Note that FileReader expects the file to be in UTF-8 encoding.
                     // If that's not the case searching for special characters will fail.
-                    doc.add(new TextField("contents", new BufferedReader(new InputStreamReader(fis, "UTF-8"))));
+
+
+//                    File inputFile = new File("infoNeeds.xml");
+//                    DocumentBuilderFactory aux = DocumentBuilderFactory.newInstance();
+//                    DocumentBuilder parseador = aux.newDocumentBuilder();
+
+//                    org.w3c.dom.Document document = parseador.parse(inputFile);
+
+
+
+
+//                    NodeList titles = parserXML.getElementsByTagName("dc:text");
+//                    NodeList subjects = parserXML.getElementsByTagName("dc:identifier");
+//                    NodeList creator = parserXML.getElementsByTagName("dc:creator");
+//                    NodeList type = parserXML.getElementsByTagName("dc:type");
+//                    NodeList date = parserXML.getElementsByTagName("dc:identifier");
+
+
+
+//                    for (int i = 0; i < titles.getLength(); i++) {
+//                        Node title = titles.item(i).getChildNodes().item(1);
+//                        doc.add(new TextField(
+//                                "title",
+//                                title.getNodeValue(), Field.Store.YES));
+//                        System.out.println(doc.getFields());
+//                    }
+
+
+//                   // document.getDocumentElement().normalize();
+//
+//                    NodeList nList = document.getElementsByTagName("dc:date");
+//                    Node nNode = nList.item(0);
+//                    if(nNode != null){
+//                        String fecha = nNode.getTextContent();
+//
+//                        StringField field1;
+//                        field1 = new StringField("date", fecha, Field.Store.YES);
+//                        doc.add(field1);
+//                    }
+//
+//
+//                    // INDICE TITULO
+//                    nList = document.getElementsByTagName("dc:title");
+//                    for (int i = 0; i < nList.getLength(); i++) {
+//                        nNode = nList.item(i);
+//
+//                        String texto = nNode.getTextContent();
+//                        StringReader sr = new StringReader(texto);
+//                        doc.add(new TextField("title", sr));
+//                    }
+//
+//                    // INDICE DESCRIPCION
+//                    nList = document.getElementsByTagName("dc:description");
+//                    for (int i = 0; i < nList.getLength(); i++) {
+//                        nNode = nList.item(i);
+//
+//                        String texto = nNode.getTextContent();
+//                        StringReader sr = new StringReader(texto);
+//                        doc.add(new TextField("description", sr));
+//                    }
+//
+//                    // INDICE AUTOR
+//                    nList = document.getElementsByTagName("dc:creator");
+//                    System.out.println(nList.getLength());
+//                    for (int i = 0; i < nList.getLength(); i++) {
+//                        nNode = nList.item(i);
+//
+//                        String texto = nNode.getTextContent();
+//                        StringReader sr = new StringReader(texto);
+//                        doc.add(new TextField("creator", sr));
+//                    }
+//
+//                    // INDICE SUBJECT
+//                    nList = document.getElementsByTagName("dc:subject");
+//                    System.out.println(nList.getLength());
+//                    for (int i = 0; i < nList.getLength(); i++) {
+//                        nNode = nList.item(i);
+//
+//                        String texto = nNode.getTextContent();
+//                        StringReader sr = new StringReader(texto);
+//
+//                        StringBuilder bd = new StringBuilder();
+//                        int charsRead = -1;
+//                        char[] chars = new char[100];
+//                        do{
+//                            charsRead = sr.read (chars, 0 , chars.length);
+//                            if (charsRead >0){
+//                                bd.append(chars,0,charsRead);
+//                            }
+//                        }while(charsRead>0);
+//                        String stringReadFromReader = bd.toString();
+//                        System.out.println("hxhxhhxh" + stringReadFromReader);
+//
+//                        doc.add(new TextField("subject", sr));
+//                    }
+//
+//                    // INDICE TYPE
+//                    nList = document.getElementsByTagName("dc:type");
+//                    for (int i = 0; i < nList.getLength(); i++) {
+//                        nNode = nList.item(i);
+//
+//                        String texto = nNode.getTextContent();
+//                        StringReader sr = new StringReader(texto);
+//                        doc.add(new TextField("type", sr));
+//                    }
+
+//                    System.out.println(result.toString());
+                    doc.add(
+                            new TextField(
+                                    "title",
+                                    obtenerEtiqueta(document, "dc:title"), Field.Store.YES));
+                    doc.add(
+                            new TextField(
+                                    "subject",
+                                    obtenerEtiqueta(document, "dc:subject"), Field.Store.YES));
+
+                    doc.add(
+                            new TextField(
+                                    "description",
+                                    obtenerEtiqueta(document, "dc:description"), Field.Store.YES));
+                    doc.add(
+                            new TextField(
+                                    "creator",
+                                    obtenerEtiqueta(document, "dc:creator"), Field.Store.YES));
+
+                    doc.add(
+                            new StringField(
+                                    "type",
+                                    obtenerEtiqueta(document, "dc:type"), Field.Store.YES));
+
+                    doc.add(
+                            new StringField(
+                                    "date",
+                                    obtenerEtiqueta(document, "dc:date"), Field.Store.YES));
+
+
+//                    BufferedReader br = new BufferedReader(
+//                            new InputStreamReader(fis, "UTF-8"));
+//
+//
+//                    doc.add(
+//                            new TextField(
+//                                    "title",
+//                                    br));
+//                    doc.add(
+//                            new TextField(
+//                                    "creator",
+//                                    new BufferedReader(
+//                                            new InputStreamReader(fis, "UTF-8"))));
+//                    doc.add(
+//                            new TextField(
+//                                    "subject",
+//                                    br));
+//                    doc.add(
+//                            new TextField(
+//                                    "description",
+//                                    new BufferedReader(
+//                                            new InputStreamReader(fis, "UTF-8"))));
+//
+//                    doc.add(
+//                            new StringField(
+//                                    "type",
+//                                    )));
+//
 
                     if (writer.getConfig().getOpenMode() == OpenMode.CREATE) {
                         // New index, so we just add the document (no old document can be there):
@@ -204,6 +425,10 @@ public class IndexFiles {
                         writer.updateDocument(new Term("path", file.getPath()), doc);
                     }
 
+                } catch (ParserConfigurationException e) {
+                    e.printStackTrace();
+                } catch (SAXException e) {
+                    e.printStackTrace();
                 } finally {
                     fis.close();
                 }

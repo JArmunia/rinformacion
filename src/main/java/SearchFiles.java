@@ -17,12 +17,11 @@
  * limitations under the License.
  */
 
-import java.io.BufferedReader;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.nio.file.Paths;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
@@ -35,14 +34,28 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.FSDirectory;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 
-/** Simple command-line based search demo. */
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+
+/**
+ * Simple command-line based search demo.
+ */
 public class SearchFiles {
 
-    private SearchFiles() {}
+    private SearchFiles() {
+    }
 
-    /** Simple command-line based search demo. */
+    /**
+     * Simple command-line based search demo.
+     */
     public static void main(String[] args) throws Exception {
+        Map<String, String> consultas = new HashMap<>();
+
+
         String usage =
                 "Usage:\tjava org.apache.lucene.demo.SearchFiles [-index dir] [-field f] [-repeat n] [-queries file] [-query string] [-raw] [-paging hitsPerPage]\n\nSee http://lucene.apache.org/core/4_1_0/demo/ for details.";
         if (args.length > 0 && ("-h".equals(args[0]) || "-help".equals(args[0]))) {
@@ -51,6 +64,8 @@ public class SearchFiles {
         }
 
         String index = "index";
+        String infoNeeds;
+        String output;
         String field = "contents";
         String queries = null;
         int repeat = 0;
@@ -58,26 +73,33 @@ public class SearchFiles {
         String queryString = null;
         int hitsPerPage = 10;
 
-        for(int i = 0;i < args.length;i++) {
+        for (int i = 0; i < args.length; i++) {
             if ("-index".equals(args[i])) {
-                index = args[i+1];
+                index = args[i + 1];
+                i++;
+            } else if ("-infoNeeds".equals(args[i])) {
+                infoNeeds = args[i + 1];
+                i++;
+            } else if ("-output".equals(args[i])) {
+                output = args[i + 1];
                 i++;
             } else if ("-field".equals(args[i])) {
-                field = args[i+1];
+                field = args[i + 1];
                 i++;
             } else if ("-queries".equals(args[i])) {
-                queries = args[i+1];
+                queries = args[i + 1];
                 i++;
+
             } else if ("-query".equals(args[i])) {
-                queryString = args[i+1];
+                queryString = args[i + 1];
                 i++;
             } else if ("-repeat".equals(args[i])) {
-                repeat = Integer.parseInt(args[i+1]);
+                repeat = Integer.parseInt(args[i + 1]);
                 i++;
             } else if ("-raw".equals(args[i])) {
                 raw = true;
             } else if ("-paging".equals(args[i])) {
-                hitsPerPage = Integer.parseInt(args[i+1]);
+                hitsPerPage = Integer.parseInt(args[i + 1]);
                 if (hitsPerPage <= 0) {
                     System.err.println("There must be at least 1 hit per page.");
                     System.exit(1);
@@ -97,6 +119,32 @@ public class SearchFiles {
             in = new BufferedReader(new InputStreamReader(System.in, "UTF-8"));
         }
         QueryParser parser = new QueryParser(field, analyzer);
+
+
+        /**
+         * Cogemos las consultas del fichero XML infoNeeds
+         */
+
+        File inputFile = new File("infoNeeds.xml");
+        DocumentBuilderFactory aux = DocumentBuilderFactory.newInstance();
+        DocumentBuilder parseador = aux.newDocumentBuilder();
+
+        org.w3c.dom.Document parserXML = parseador.parse(inputFile);
+
+        NodeList textos = parserXML.getElementsByTagName("text");
+        NodeList identificadores = parserXML.getElementsByTagName("identifier");
+
+
+        for (int i = 0; i < textos.getLength(); i++) {
+            Node texto = textos.item(i).getChildNodes().item(0);
+            Node identificador = identificadores.item(i).getChildNodes().item(0);
+
+            consultas.put(identificador.getNodeValue(), texto.getNodeValue());
+        }
+
+
+
+
         while (true) {
             if (queries == null && queryString == null) {                        // prompt the user
                 System.out.println("Enter query: ");
@@ -122,10 +170,15 @@ public class SearchFiles {
                     searcher.search(query, 100);
                 }
                 Date end = new Date();
-                System.out.println("Time: "+(end.getTime()-start.getTime())+"ms");
+                System.out.println("Time: " + (end.getTime() - start.getTime()) + "ms");
             }
 
-            doPagingSearch(in, searcher, query, hitsPerPage, raw, queries == null && queryString == null);
+//            for(Map.Entry<String, String> entry : consultas.entrySet()){
+//                doPagingSearch(entry.getValue(),
+//                        searcher, query, hitsPerPage, raw,  queries == null && queryString == null);
+//            }
+
+            //doPagingSearch(in, searcher, query, hitsPerPage, raw, queries == null && queryString == null);
 
             if (queryString != null) {
                 break;
@@ -138,11 +191,10 @@ public class SearchFiles {
      * This demonstrates a typical paging search scenario, where the search engine presents
      * pages of size n to the user. The user can then go to the next page if interested in
      * the next hits.
-     *
+     * <p>
      * When the query is executed for the first time, then only enough results are collected
      * to fill 5 result pages. If the user wants to page beyond this limit, then the query
      * is executed another time and all hits are collected.
-     *
      */
     public static void doPagingSearch(BufferedReader in, IndexSearcher searcher, Query query,
                                       int hitsPerPage, boolean raw, boolean interactive) throws IOException {
@@ -151,7 +203,7 @@ public class SearchFiles {
         TopDocs results = searcher.search(query, 5 * hitsPerPage);
         ScoreDoc[] hits = results.scoreDocs;
 
-        int numTotalHits = (int)results.totalHits;
+        int numTotalHits = (int) results.totalHits;
         System.out.println(numTotalHits + " total matching documents");
 
         int start = 0;
@@ -159,7 +211,7 @@ public class SearchFiles {
 
         while (true) {
             if (end > hits.length) {
-                System.out.println("Only results 1 - " + hits.length +" of " + numTotalHits + " total matching documents collected.");
+                System.out.println("Only results 1 - " + hits.length + " of " + numTotalHits + " total matching documents collected.");
                 System.out.println("Collect more (y/n) ?");
                 String line = in.readLine();
                 if (line.length() == 0 || line.charAt(0) == 'n') {
@@ -173,16 +225,16 @@ public class SearchFiles {
 
             for (int i = start; i < end; i++) {
                 if (raw) {                              // output raw format
-                    System.out.println("doc="+hits[i].doc+" score="+hits[i].score);
+                    System.out.println("doc=" + hits[i].doc + " score=" + hits[i].score);
                     continue;
                 }
 
                 Document doc = searcher.doc(hits[i].doc);
                 String path = doc.get("path");
                 if (path != null) {
-                    System.out.println((i+1) + ". " + path);
+                    System.out.println((i + 1) + ". " + path);
                 } else {
-                    System.out.println((i+1) + ". " + "No path for this document");
+                    System.out.println((i + 1) + ". " + "No path for this document");
                 }
 
             }
@@ -204,7 +256,7 @@ public class SearchFiles {
                     System.out.println("(q)uit or enter number to jump to a page.");
 
                     String line = in.readLine();
-                    if (line.length() == 0 || line.charAt(0)=='q') {
+                    if (line.length() == 0 || line.charAt(0) == 'q') {
                         quit = true;
                         break;
                     }
@@ -213,7 +265,7 @@ public class SearchFiles {
                         break;
                     } else if (line.charAt(0) == 'n') {
                         if (start + hitsPerPage < numTotalHits) {
-                            start+=hitsPerPage;
+                            start += hitsPerPage;
                         }
                         break;
                     } else {
