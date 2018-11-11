@@ -22,6 +22,8 @@ import java.nio.file.Paths;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
@@ -29,10 +31,7 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.queryparser.classic.QueryParser;
-import org.apache.lucene.search.IndexSearcher;
-import org.apache.lucene.search.Query;
-import org.apache.lucene.search.ScoreDoc;
-import org.apache.lucene.search.TopDocs;
+import org.apache.lucene.search.*;
 import org.apache.lucene.store.FSDirectory;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -118,7 +117,12 @@ public class SearchFiles {
         } else {
             in = new BufferedReader(new InputStreamReader(System.in, "UTF-8"));
         }
-        QueryParser parser = new QueryParser(field, analyzer);
+        QueryParser titleParser = new QueryParser("title", analyzer);
+        QueryParser descriptionParser = new QueryParser("description", analyzer);
+        QueryParser dateParser = new QueryParser("date", analyzer);
+        QueryParser subjectParser = new QueryParser("subject", analyzer);
+        QueryParser typeParser = new QueryParser("type", analyzer);
+        QueryParser creatorParser = new QueryParser("creator", analyzer);
 
 
         /**
@@ -142,6 +146,10 @@ public class SearchFiles {
             consultas.put(identificador.getNodeValue(), texto.getNodeValue());
         }
 
+        for (Map.Entry<String,String> entry : consultas.entrySet()){
+            System.out.println(entry.getKey()+" " +entry.getValue());
+        }
+
 
 
 
@@ -161,7 +169,68 @@ public class SearchFiles {
                 break;
             }
 
-            Query query = parser.parse(line);
+            String anyo = "[0-9]{4}";
+            Pattern patronIntervalo = Pattern.compile(anyo + "-" + anyo + "|" + anyo + " y " + anyo);
+            Pattern patronUltimos = Pattern.compile("últimos [0-9]+ años");
+            Matcher matcherIntervalo = patronIntervalo.matcher(line);
+            Matcher matcherUltimos = patronUltimos.matcher(line);
+            BooleanQuery query = null;
+            if(matcherIntervalo.find()) {
+
+                Query queryTitulo = titleParser.parse(line);
+                BoostQuery queryTituloFin = new BoostQuery(queryTitulo,2);
+                Query querySubject = subjectParser.parse(line);
+                BoostQuery querySubjectFin = new BoostQuery(querySubject,1.5f);
+                Query queryDescription = descriptionParser.parse(line);
+                BoostQuery queryDescriptionFin = new BoostQuery(querySubject,1);
+                String fInicio = matcherIntervalo.group().substring(0, 4);
+                String fFin = matcherIntervalo.group().substring(matcherIntervalo.group().length()-4, matcherIntervalo.group().length());
+                Query queryIntervalo = TermRangeQuery.newStringRange("date", fInicio, fFin, true, true);
+                query = new BooleanQuery.Builder()
+                        .add(queryTituloFin, BooleanClause.Occur.SHOULD)
+                        .add(querySubjectFin, BooleanClause.Occur.SHOULD)
+                        .add(queryDescriptionFin, BooleanClause.Occur.SHOULD)
+                        .add(queryIntervalo, BooleanClause.Occur.MUST)
+                        .build();
+            }else if(matcherUltimos.find()) {
+
+                Query query2 = dateParser.parse(line);
+                BoostQuery query4 = new BoostQuery(query2,1);
+                BoostQuery query3 = new BoostQuery(query2,2);
+                String fInicio = matcherUltimos.group().substring(0, 4);
+                String fFin = matcherUltimos.group().substring(matcherUltimos.group().length()-4, matcherUltimos.group().length());
+                Query q35 = TermRangeQuery.newStringRange("date", fInicio, fFin, true, true);
+                query = new BooleanQuery.Builder()
+                        .add(query4, BooleanClause.Occur.SHOULD)
+                        .add(query3, BooleanClause.Occur.SHOULD)
+                        .add(q35, BooleanClause.Occur.MUST)
+                        .build();
+            }else if(matcherIntervalo.find()) {
+
+                Query query2 = parser.parse(line);
+                BoostQuery query4 = new BoostQuery(query2,1);
+                BoostQuery query3 = new BoostQuery(query2,2);
+                String fInicio = matcherIntervalo.group().substring(0, 4);
+                String fFin = matcherIntervalo.group().substring(matcherIntervalo.group().length()-4, matcherIntervalo.group().length());
+                Query q35 = TermRangeQuery.newStringRange("date", fInicio, fFin, true, true);
+                query = new BooleanQuery.Builder()
+                        .add(query4, BooleanClause.Occur.SHOULD)
+                        .add(query3, BooleanClause.Occur.SHOULD)
+                        .add(q35, BooleanClause.Occur.MUST)
+                        .build();
+            }
+            else{
+                Query query2 = parser.parse(line);
+                BoostQuery query4 = new BoostQuery(query2,1);
+
+                BoostQuery query3 = new BoostQuery(query2,2);
+                query = new BooleanQuery.Builder()
+                        .add(query4, BooleanClause.Occur.SHOULD)
+                        .add(query3, BooleanClause.Occur.SHOULD)
+                        .build();
+            }
+
+
             System.out.println("Searching for: " + query.toString(field));
 
             if (repeat > 0) {                           // repeat & time as benchmark
