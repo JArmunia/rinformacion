@@ -24,15 +24,12 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.queryparser.classic.MultiFieldQueryParser;
 import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.search.*;
 import org.apache.lucene.store.FSDirectory;
-import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
@@ -53,21 +50,18 @@ public class SearchFiles {
     public static void main(String[] args) throws Exception {
         Map<String, String> consultas = new HashMap<>();
 
-
         String usage =
-                "Usage:\tjava org.apache.lucene.demo.SearchFiles [-index dir] [-field f] [-repeat n] [-queries file] [-query string] [-raw] [-paging hitsPerPage]\n\nSee http://lucene.apache.org/core/4_1_0/demo/ for details.";
-        if (args.length > 0 && ("-h".equals(args[0]) || "-help".equals(args[0]))) {
+                "Usage:\tjava org.apache.lucene.demo.SearchFiles [-index dir] [-infoNeeds file] [-output file]\n\nSee http://lucene.apache.org/core/4_1_0/demo/ for details.";
+        if (args.length > 0 && ("-h".equals(args[0]) || "-help".equals(args[0]) || args.length !=6)) {
             System.out.println(usage);
             System.exit(0);
         }
 
         String index = "index";
-        String infoNeeds;
+        String infoNeeds = null;
         String output = null;
-        String field = "contents";
-        String queries = null;
-        int repeat = 0;
-        boolean raw = false;
+
+
         String queryString = null;
 
 
@@ -91,26 +85,19 @@ public class SearchFiles {
         Analyzer analizadorBusqueda = new AnalizadorBusqueda();
         Analyzer analizadorAutores = new AnalizadorAutores();
 
-//        BufferedReader in = null;
-//        if (queries != null) {
-//            in = new BufferedReader(new InputStreamReader(new FileInputStream(queries), "UTF-8"));
-//        } else {
-//            in = new BufferedReader(new InputStreamReader(System.in, "UTF-8"));
-//        }
+
         QueryParser titleParser = new QueryParser("title", analizadorBusqueda);
         QueryParser descriptionParser = new QueryParser("description", analizadorBusqueda);
-        //QueryParser dateParser = new QueryParser("date", analyzer);
         QueryParser subjectParser = new QueryParser("subject", analizadorBusqueda);
         QueryParser typeParser = new QueryParser("type", analizadorBusqueda);
         QueryParser creatorParser = new QueryParser("creator", analizadorAutores);
-
 
 
         /**
          * Cogemos las consultas del fichero XML infoNeeds
          */
 
-        File inputFile = new File("infoNeeds.xml");
+        File inputFile = new File(infoNeeds);
         DocumentBuilderFactory aux = DocumentBuilderFactory.newInstance();
         DocumentBuilder parseador = aux.newDocumentBuilder();
 
@@ -127,10 +114,7 @@ public class SearchFiles {
             consultas.put(identificador.getNodeValue(), texto.getNodeValue());
         }
 
-        for (Map.Entry<String,String> entry : consultas.entrySet()){
-            //System.out.println(entry.getKey()+" " +entry.getValue());
-
-
+        for (Map.Entry<String, String> entry : consultas.entrySet()) {
 
             String consulta = entry.getValue();
             String identifier = entry.getKey();
@@ -163,16 +147,16 @@ public class SearchFiles {
 
 
             BooleanQuery query = null;
-            if(matcherIntervalo.find()) {
+            if (matcherIntervalo.find()) {
 
                 Query queryTitulo = titleParser.parse(consulta);
-                BoostQuery queryTituloFin = new BoostQuery(queryTitulo,2);
+                BoostQuery queryTituloFin = new BoostQuery(queryTitulo, 2);
                 Query querySubject = subjectParser.parse(consulta);
-                BoostQuery querySubjectFin = new BoostQuery(querySubject,1.5f);
+                BoostQuery querySubjectFin = new BoostQuery(querySubject, 1.5f);
                 Query queryDescription = descriptionParser.parse(consulta);
-                BoostQuery queryDescriptionFin = new BoostQuery(queryDescription,1);
+                BoostQuery queryDescriptionFin = new BoostQuery(queryDescription, 1);
                 String fInicio = matcherIntervalo.group().substring(0, 4);
-                String fFin = matcherIntervalo.group().substring(matcherIntervalo.group().length()-4, matcherIntervalo.group().length());
+                String fFin = matcherIntervalo.group().substring(matcherIntervalo.group().length() - 4, matcherIntervalo.group().length());
                 Query queryIntervalo = TermRangeQuery.newStringRange("date", fInicio, fFin, true, true);
                 query = new BooleanQuery.Builder()
                         .add(queryTituloFin, BooleanClause.Occur.SHOULD)
@@ -180,19 +164,18 @@ public class SearchFiles {
                         .add(queryDescriptionFin, BooleanClause.Occur.SHOULD)
                         .add(queryIntervalo, BooleanClause.Occur.MUST)
                         .build();
-            }
-            else if(matcherUltimos.find()) {
+            } else if (matcherUltimos.find()) {
                 Query queryTitulo = titleParser.parse(consulta);
-                BoostQuery queryTituloFin = new BoostQuery(queryTitulo,2);
+                BoostQuery queryTituloFin = new BoostQuery(queryTitulo, 2);
                 Query querySubject = subjectParser.parse(consulta);
-                BoostQuery querySubjectFin = new BoostQuery(querySubject,1.5f);
+                BoostQuery querySubjectFin = new BoostQuery(querySubject, 1.5f);
                 Query queryDescription = descriptionParser.parse(consulta);
-                BoostQuery queryDescriptionFin = new BoostQuery(queryDescription,1);
+                BoostQuery queryDescriptionFin = new BoostQuery(queryDescription, 1);
                 String auxString = matcherUltimos.group();
                 auxString = auxString.replaceAll("últimos ", "");
                 auxString = auxString.replaceAll(" años", "");
                 Integer offset = Integer.parseInt(auxString);
-                Integer intFecha = 2018-offset;
+                Integer intFecha = 2018 - offset;
                 String fInicio = intFecha.toString();
                 Query queryIntervalo = TermRangeQuery.newStringRange("date", fInicio, "2018", true, true);
                 query = new BooleanQuery.Builder()
@@ -201,14 +184,13 @@ public class SearchFiles {
                         .add(queryDescriptionFin, BooleanClause.Occur.SHOULD)
                         .add(queryIntervalo, BooleanClause.Occur.MUST)
                         .build();
-            }
-            else if(matcherNombre.find()) {
+            } else if (matcherNombre.find()) {
                 Query queryTitulo = titleParser.parse(consulta);
-                BoostQuery queryTituloFin = new BoostQuery(queryTitulo,2);
+                BoostQuery queryTituloFin = new BoostQuery(queryTitulo, 2);
                 Query querySubject = subjectParser.parse(consulta);
-                BoostQuery querySubjectFin = new BoostQuery(querySubject,1.5f);
+                BoostQuery querySubjectFin = new BoostQuery(querySubject, 1.5f);
                 Query queryDescription = descriptionParser.parse(consulta);
-                BoostQuery queryDescriptionFin = new BoostQuery(queryDescription,1);
+                BoostQuery queryDescriptionFin = new BoostQuery(queryDescription, 1);
                 Query queryCreator = creatorParser.parse(matcherNombre.group());
                 query = new BooleanQuery.Builder()
                         .add(queryTituloFin, BooleanClause.Occur.SHOULD)
@@ -216,14 +198,13 @@ public class SearchFiles {
                         .add(queryDescriptionFin, BooleanClause.Occur.SHOULD)
                         .add(queryCreator, BooleanClause.Occur.MUST)
                         .build();
-            }
-            else if(matcherGrado.find() && !matcherMaster.find()) {
+            } else if (matcherGrado.find() && !matcherMaster.find()) {
                 Query queryTitulo = titleParser.parse(consulta);
-                BoostQuery queryTituloFin = new BoostQuery(queryTitulo,2);
+                BoostQuery queryTituloFin = new BoostQuery(queryTitulo, 2);
                 Query querySubject = subjectParser.parse(consulta);
-                BoostQuery querySubjectFin = new BoostQuery(querySubject,1.5f);
+                BoostQuery querySubjectFin = new BoostQuery(querySubject, 1.5f);
                 Query queryDescription = descriptionParser.parse(consulta);
-                BoostQuery queryDescriptionFin = new BoostQuery(queryDescription,1);
+                BoostQuery queryDescriptionFin = new BoostQuery(queryDescription, 1);
                 Query queryTipo = typeParser.parse("info:eu-repo/semantics/bachelorThesis");
 
                 query = new BooleanQuery.Builder()
@@ -232,14 +213,13 @@ public class SearchFiles {
                         .add(queryDescriptionFin, BooleanClause.Occur.SHOULD)
                         .add(queryTipo, BooleanClause.Occur.MUST)
                         .build();
-            }
-            else if(matcherMaster.find() && !matcherGrado.find()) {
+            } else if (matcherMaster.find() && !matcherGrado.find()) {
                 Query queryTitulo = titleParser.parse(consulta);
-                BoostQuery queryTituloFin = new BoostQuery(queryTitulo,2);
+                BoostQuery queryTituloFin = new BoostQuery(queryTitulo, 2);
                 Query querySubject = subjectParser.parse(consulta);
-                BoostQuery querySubjectFin = new BoostQuery(querySubject,1.5f);
+                BoostQuery querySubjectFin = new BoostQuery(querySubject, 1.5f);
                 Query queryDescription = descriptionParser.parse(consulta);
-                BoostQuery queryDescriptionFin = new BoostQuery(queryDescription,1);
+                BoostQuery queryDescriptionFin = new BoostQuery(queryDescription, 1);
                 Query queryTipo = typeParser.parse("info:eu-repo/semantics/masterThesis");
                 query = new BooleanQuery.Builder()
                         .add(queryTituloFin, BooleanClause.Occur.SHOULD)
@@ -247,14 +227,13 @@ public class SearchFiles {
                         .add(queryDescriptionFin, BooleanClause.Occur.SHOULD)
                         .add(queryTipo, BooleanClause.Occur.MUST)
                         .build();
-            }
-            else if(matcherMaster.find() && matcherGrado.find()) {
+            } else if (matcherMaster.find() && matcherGrado.find()) {
                 Query queryTitulo = titleParser.parse(consulta);
-                BoostQuery queryTituloFin = new BoostQuery(queryTitulo,2);
+                BoostQuery queryTituloFin = new BoostQuery(queryTitulo, 2);
                 Query querySubject = subjectParser.parse(consulta);
-                BoostQuery querySubjectFin = new BoostQuery(querySubject,1.5f);
+                BoostQuery querySubjectFin = new BoostQuery(querySubject, 1.5f);
                 Query queryDescription = descriptionParser.parse(consulta);
-                BoostQuery queryDescriptionFin = new BoostQuery(queryDescription,1);
+                BoostQuery queryDescriptionFin = new BoostQuery(queryDescription, 1);
                 Query queryTipo = typeParser.parse("info:eu-repo/semantics/masterThesis");
                 Query queryTipo2 = typeParser.parse("info:eu-repo/semantics/bachelorThesis");
                 query = new BooleanQuery.Builder()
@@ -264,37 +243,19 @@ public class SearchFiles {
                         .add(queryTipo, BooleanClause.Occur.MUST)
                         .add(queryTipo2, BooleanClause.Occur.MUST)
                         .build();
-            }
-            else{
+            } else {
                 Query queryTitulo = titleParser.parse(consulta);
-                BoostQuery queryTituloFin = new BoostQuery(queryTitulo,2);
+                BoostQuery queryTituloFin = new BoostQuery(queryTitulo, 2);
                 Query querySubject = subjectParser.parse(consulta);
-                BoostQuery querySubjectFin = new BoostQuery(querySubject,1.5f);
+                BoostQuery querySubjectFin = new BoostQuery(querySubject, 1.5f);
                 Query queryDescription = descriptionParser.parse(consulta);
-                BoostQuery queryDescriptionFin = new BoostQuery(queryDescription,1);
+                BoostQuery queryDescriptionFin = new BoostQuery(queryDescription, 1);
                 query = new BooleanQuery.Builder()
                         .add(queryTituloFin, BooleanClause.Occur.SHOULD)
                         .add(querySubjectFin, BooleanClause.Occur.SHOULD)
                         .add(queryDescriptionFin, BooleanClause.Occur.SHOULD)
                         .build();
             }
-
-
-            System.out.println("Searching for: " + query.toString(field));
-
-            if (repeat > 0) {                           // repeat & time as benchmark
-                Date start = new Date();
-                for (int i = 0; i < repeat; i++) {
-                    searcher.search(query, 100);
-                }
-                Date end = new Date();
-                System.out.println("Time: " + (end.getTime() - start.getTime()) + "ms");
-            }
-
-//            for(Map.Entry<String, String> entry : consultas.entrySet()){
-//                doPagingSearch(entry.getValue(),
-//                        searcher, query, hitsPerPage, raw,  queries == null && queryString == null);
-//            }
 
             doPagingSearch(out, searcher, query, identifier);
 
@@ -324,8 +285,7 @@ public class SearchFiles {
         System.out.println(numTotalHits + " total matching documents");
 
 
-
-        for(int i=0; i < numTotalHits; i++){
+        for (int i = 0; i < numTotalHits; i++) {
             Document doc = searcher.doc(hits[i].doc);
             String path = doc.get("path");
             path = path.replaceAll("recordsdc\\\\", "");
@@ -336,81 +296,6 @@ public class SearchFiles {
             }
         }
         System.out.println("FIN CONSULTA " + identifier);
-//        int start = 0;
-//        int end = Math.min(numTotalHits, hitsPerPage);
-//
-//        while (true) {
-//            if (end > hits.length) {
-//                System.out.println("Only results 1 - " + hits.length + " of " + numTotalHits + " total matching documents collected.");
-//                System.out.println("Collect more (y/n) ?");
-//                String line = in.readLine();
-//                if (line.length() == 0 || line.charAt(0) == 'n') {
-//                    break;
-//                }
-//
-//                hits = searcher.search(query, numTotalHits).scoreDocs;
-//            }
-//
-//            end = Math.min(hits.length, start + hitsPerPage);
-//
-//            for (int i = start; i < end; i++) {
-//                if (raw) {                              // output raw format
-//                    System.out.println("doc=" + hits[i].doc + " score=" + hits[i].score);
-//                    continue;
-//                }
-//
-//                Document doc = searcher.doc(hits[i].doc);
-//                String path = doc.get("path");
-//                if (path != null) {
-//                    System.out.println((i + 1) + ". " + path);
-//                } else {
-//                    System.out.println((i + 1) + ". " + "No path for this document");
-//                }
-//
-//            }
-//
-//            if (!interactive || end == 0) {
-//                break;
-//            }
-//
-//            if (numTotalHits >= end) {
-//                boolean quit = false;
-//                while (true) {
-//                    System.out.print("Press ");
-//                    if (start - hitsPerPage >= 0) {
-//                        System.out.print("(p)revious page, ");
-//                    }
-//                    if (start + hitsPerPage < numTotalHits) {
-//                        System.out.print("(n)ext page, ");
-//                    }
-//                    System.out.println("(q)uit or enter number to jump to a page.");
-//
-//                    String line = in.readLine();
-//                    if (line.length() == 0 || line.charAt(0) == 'q') {
-//                        quit = true;
-//                        break;
-//                    }
-//                    if (line.charAt(0) == 'p') {
-//                        start = Math.max(0, start - hitsPerPage);
-//                        break;
-//                    } else if (line.charAt(0) == 'n') {
-//                        if (start + hitsPerPage < numTotalHits) {
-//                            start += hitsPerPage;
-//                        }
-//                        break;
-//                    } else {
-//                        int page = Integer.parseInt(line);
-//                        if ((page - 1) * hitsPerPage < numTotalHits) {
-//                            start = (page - 1) * hitsPerPage;
-//                            break;
-//                        } else {
-//                            System.out.println("No such page");
-//                        }
-//                    }
-//                }
-//                if (quit) break;
-//                end = Math.min(numTotalHits, start + hitsPerPage);
-//            }
-//        }
+
     }
 }

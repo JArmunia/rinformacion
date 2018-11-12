@@ -79,8 +79,6 @@ public class IndexFiles {
             } else if ("-docs".equals(args[i])) {
                 docsPath = args[i + 1];
                 i++;
-            } else if ("-update".equals(args[i])) {
-                create = false;
             }
         }
 
@@ -209,7 +207,6 @@ public class IndexFiles {
                     DocumentBuilder parseador = aux.newDocumentBuilder();
 
                     org.w3c.dom.Document document = parseador.parse(file);
-                    //System.out.println(parserXML.toString());
 
                     // make a new, empty document
                     Document doc = new Document();
@@ -220,19 +217,6 @@ public class IndexFiles {
                     // or positional information:
                     Field pathField = new StringField("path", file.getPath(), Field.Store.YES);
                     doc.add(pathField);
-
-
-//                    SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
-//                    Field lastDate =
-//                            new StringField(
-//                                    "lastDate",
-//                                    sdf.format(file.lastModified()),
-//                                    Field.Store.YES);
-//
-//                    doc.add(lastDate);
-
-                    //NamedNodeMap etiquetasXML = parserXML.getAttributes();
-
 
                     // Add the last modified date of the file a field named "modified".
                     // Use a LongField that is indexed (i.e. efficiently filterable with
@@ -249,111 +233,6 @@ public class IndexFiles {
                     // If that's not the case searching for special characters will fail.
 
 
-//                    File inputFile = new File("infoNeeds.xml");
-//                    DocumentBuilderFactory aux = DocumentBuilderFactory.newInstance();
-//                    DocumentBuilder parseador = aux.newDocumentBuilder();
-
-//                    org.w3c.dom.Document document = parseador.parse(inputFile);
-
-
-
-
-//                    NodeList titles = parserXML.getElementsByTagName("dc:text");
-//                    NodeList subjects = parserXML.getElementsByTagName("dc:identifier");
-//                    NodeList creator = parserXML.getElementsByTagName("dc:creator");
-//                    NodeList type = parserXML.getElementsByTagName("dc:type");
-//                    NodeList date = parserXML.getElementsByTagName("dc:identifier");
-
-
-
-//                    for (int i = 0; i < titles.getLength(); i++) {
-//                        Node title = titles.item(i).getChildNodes().item(1);
-//                        doc.add(new TextField(
-//                                "title",
-//                                title.getNodeValue(), Field.Store.YES));
-//                        System.out.println(doc.getFields());
-//                    }
-
-
-//                   // document.getDocumentElement().normalize();
-//
-//                    NodeList nList = document.getElementsByTagName("dc:date");
-//                    Node nNode = nList.item(0);
-//                    if(nNode != null){
-//                        String fecha = nNode.getTextContent();
-//
-//                        StringField field1;
-//                        field1 = new StringField("date", fecha, Field.Store.YES);
-//                        doc.add(field1);
-//                    }
-//
-//
-//                    // INDICE TITULO
-//                    nList = document.getElementsByTagName("dc:title");
-//                    for (int i = 0; i < nList.getLength(); i++) {
-//                        nNode = nList.item(i);
-//
-//                        String texto = nNode.getTextContent();
-//                        StringReader sr = new StringReader(texto);
-//                        doc.add(new TextField("title", sr));
-//                    }
-//
-//                    // INDICE DESCRIPCION
-//                    nList = document.getElementsByTagName("dc:description");
-//                    for (int i = 0; i < nList.getLength(); i++) {
-//                        nNode = nList.item(i);
-//
-//                        String texto = nNode.getTextContent();
-//                        StringReader sr = new StringReader(texto);
-//                        doc.add(new TextField("description", sr));
-//                    }
-//
-//                    // INDICE AUTOR
-//                    nList = document.getElementsByTagName("dc:creator");
-//                    System.out.println(nList.getLength());
-//                    for (int i = 0; i < nList.getLength(); i++) {
-//                        nNode = nList.item(i);
-//
-//                        String texto = nNode.getTextContent();
-//                        StringReader sr = new StringReader(texto);
-//                        doc.add(new TextField("creator", sr));
-//                    }
-//
-//                    // INDICE SUBJECT
-//                    nList = document.getElementsByTagName("dc:subject");
-//                    System.out.println(nList.getLength());
-//                    for (int i = 0; i < nList.getLength(); i++) {
-//                        nNode = nList.item(i);
-//
-//                        String texto = nNode.getTextContent();
-//                        StringReader sr = new StringReader(texto);
-//
-//                        StringBuilder bd = new StringBuilder();
-//                        int charsRead = -1;
-//                        char[] chars = new char[100];
-//                        do{
-//                            charsRead = sr.read (chars, 0 , chars.length);
-//                            if (charsRead >0){
-//                                bd.append(chars,0,charsRead);
-//                            }
-//                        }while(charsRead>0);
-//                        String stringReadFromReader = bd.toString();
-//                        System.out.println("hxhxhhxh" + stringReadFromReader);
-//
-//                        doc.add(new TextField("subject", sr));
-//                    }
-//
-//                    // INDICE TYPE
-//                    nList = document.getElementsByTagName("dc:type");
-//                    for (int i = 0; i < nList.getLength(); i++) {
-//                        nNode = nList.item(i);
-//
-//                        String texto = nNode.getTextContent();
-//                        StringReader sr = new StringReader(texto);
-//                        doc.add(new TextField("type", sr));
-//                    }
-
-//                    System.out.println(result.toString());
                     doc.add(
                             new TextField(
                                     "title",
@@ -382,35 +261,6 @@ public class IndexFiles {
                                     "date",
                                     obtenerEtiqueta(document, "dc:date"), Field.Store.YES));
 
-
-//                    BufferedReader br = new BufferedReader(
-//                            new InputStreamReader(fis, "UTF-8"));
-//
-//
-//                    doc.add(
-//                            new TextField(
-//                                    "title",
-//                                    br));
-//                    doc.add(
-//                            new TextField(
-//                                    "creator",
-//                                    new BufferedReader(
-//                                            new InputStreamReader(fis, "UTF-8"))));
-//                    doc.add(
-//                            new TextField(
-//                                    "subject",
-//                                    br));
-//                    doc.add(
-//                            new TextField(
-//                                    "description",
-//                                    new BufferedReader(
-//                                            new InputStreamReader(fis, "UTF-8"))));
-//
-//                    doc.add(
-//                            new StringField(
-//                                    "type",
-//                                    )));
-//
 
                     if (writer.getConfig().getOpenMode() == OpenMode.CREATE) {
                         // New index, so we just add the document (no old document can be there):
