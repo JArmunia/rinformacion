@@ -1,5 +1,3 @@
-
-
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -30,6 +28,7 @@ import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.queryparser.classic.MultiFieldQueryParser;
 import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.search.*;
 import org.apache.lucene.store.FSDirectory;
@@ -64,13 +63,13 @@ public class SearchFiles {
 
         String index = "index";
         String infoNeeds;
-        String output;
+        String output = null;
         String field = "contents";
         String queries = null;
         int repeat = 0;
         boolean raw = false;
         String queryString = null;
-        int hitsPerPage = 10;
+
 
         for (int i = 0; i < args.length; i++) {
             if ("-index".equals(args[i])) {
@@ -82,47 +81,29 @@ public class SearchFiles {
             } else if ("-output".equals(args[i])) {
                 output = args[i + 1];
                 i++;
-            } else if ("-field".equals(args[i])) {
-                field = args[i + 1];
-                i++;
-            } else if ("-queries".equals(args[i])) {
-                queries = args[i + 1];
-                i++;
-
-            } else if ("-query".equals(args[i])) {
-                queryString = args[i + 1];
-                i++;
-            } else if ("-repeat".equals(args[i])) {
-                repeat = Integer.parseInt(args[i + 1]);
-                i++;
-            } else if ("-raw".equals(args[i])) {
-                raw = true;
-            } else if ("-paging".equals(args[i])) {
-                hitsPerPage = Integer.parseInt(args[i + 1]);
-                if (hitsPerPage <= 0) {
-                    System.err.println("There must be at least 1 hit per page.");
-                    System.exit(1);
-                }
-                i++;
             }
         }
 
+        File fichero = new File(output);
+        BufferedWriter out = new BufferedWriter(new FileWriter(fichero, false));
         IndexReader reader = DirectoryReader.open(FSDirectory.open(Paths.get(index)));
         IndexSearcher searcher = new IndexSearcher(reader);
-        Analyzer analyzer = new StandardAnalyzer();
+        Analyzer analizadorBusqueda = new AnalizadorBusqueda();
+        Analyzer analizadorAutores = new AnalizadorAutores();
 
-        BufferedReader in = null;
-        if (queries != null) {
-            in = new BufferedReader(new InputStreamReader(new FileInputStream(queries), "UTF-8"));
-        } else {
-            in = new BufferedReader(new InputStreamReader(System.in, "UTF-8"));
-        }
-        QueryParser titleParser = new QueryParser("title", analyzer);
-        QueryParser descriptionParser = new QueryParser("description", analyzer);
-        QueryParser dateParser = new QueryParser("date", analyzer);
-        QueryParser subjectParser = new QueryParser("subject", analyzer);
-        QueryParser typeParser = new QueryParser("type", analyzer);
-        QueryParser creatorParser = new QueryParser("creator", analyzer);
+//        BufferedReader in = null;
+//        if (queries != null) {
+//            in = new BufferedReader(new InputStreamReader(new FileInputStream(queries), "UTF-8"));
+//        } else {
+//            in = new BufferedReader(new InputStreamReader(System.in, "UTF-8"));
+//        }
+        QueryParser titleParser = new QueryParser("title", analizadorBusqueda);
+        QueryParser descriptionParser = new QueryParser("description", analizadorBusqueda);
+        //QueryParser dateParser = new QueryParser("date", analyzer);
+        QueryParser subjectParser = new QueryParser("subject", analizadorBusqueda);
+        QueryParser typeParser = new QueryParser("type", analizadorBusqueda);
+        QueryParser creatorParser = new QueryParser("creator", analizadorAutores);
+
 
 
         /**
@@ -147,42 +128,49 @@ public class SearchFiles {
         }
 
         for (Map.Entry<String,String> entry : consultas.entrySet()){
-            System.out.println(entry.getKey()+" " +entry.getValue());
-        }
+            //System.out.println(entry.getKey()+" " +entry.getValue());
 
 
 
+            String consulta = entry.getValue();
+            String identifier = entry.getKey();
+            System.out.println(consulta);
 
-        while (true) {
-            if (queries == null && queryString == null) {                        // prompt the user
-                System.out.println("Enter query: ");
-            }
-
-            String line = queryString != null ? queryString : in.readLine();
-
-            if (line == null || line.length() == -1) {
+            if (consulta == null || consulta.length() == -1) {
                 break;
             }
 
-            line = line.trim();
-            if (line.length() == 0) {
+            consulta = consulta.trim();
+            if (consulta.length() == 0) {
                 break;
             }
 
             String anyo = "[0-9]{4}";
+            String nombrePropio = "María";
+            String finMaster = "Fin de Máster";
+            String finGrado = "fin de grado";
+
             Pattern patronIntervalo = Pattern.compile(anyo + "-" + anyo + "|" + anyo + " y " + anyo);
             Pattern patronUltimos = Pattern.compile("últimos [0-9]+ años");
-            Matcher matcherIntervalo = patronIntervalo.matcher(line);
-            Matcher matcherUltimos = patronUltimos.matcher(line);
+            Pattern patronMaster = Pattern.compile(finMaster);
+            Pattern patronGrado = Pattern.compile(finGrado);
+            Pattern patronNombre = Pattern.compile(nombrePropio);
+            Matcher matcherIntervalo = patronIntervalo.matcher(consulta);
+            Matcher matcherUltimos = patronUltimos.matcher(consulta);
+            Matcher matcherMaster = patronMaster.matcher(consulta);
+            Matcher matcherGrado = patronGrado.matcher(consulta);
+            Matcher matcherNombre = patronNombre.matcher(consulta);
+
+
             BooleanQuery query = null;
             if(matcherIntervalo.find()) {
 
-                Query queryTitulo = titleParser.parse(line);
+                Query queryTitulo = titleParser.parse(consulta);
                 BoostQuery queryTituloFin = new BoostQuery(queryTitulo,2);
-                Query querySubject = subjectParser.parse(line);
+                Query querySubject = subjectParser.parse(consulta);
                 BoostQuery querySubjectFin = new BoostQuery(querySubject,1.5f);
-                Query queryDescription = descriptionParser.parse(line);
-                BoostQuery queryDescriptionFin = new BoostQuery(querySubject,1);
+                Query queryDescription = descriptionParser.parse(consulta);
+                BoostQuery queryDescriptionFin = new BoostQuery(queryDescription,1);
                 String fInicio = matcherIntervalo.group().substring(0, 4);
                 String fFin = matcherIntervalo.group().substring(matcherIntervalo.group().length()-4, matcherIntervalo.group().length());
                 Query queryIntervalo = TermRangeQuery.newStringRange("date", fInicio, fFin, true, true);
@@ -192,41 +180,102 @@ public class SearchFiles {
                         .add(queryDescriptionFin, BooleanClause.Occur.SHOULD)
                         .add(queryIntervalo, BooleanClause.Occur.MUST)
                         .build();
-            }else if(matcherUltimos.find()) {
-
-                Query query2 = dateParser.parse(line);
-                BoostQuery query4 = new BoostQuery(query2,1);
-                BoostQuery query3 = new BoostQuery(query2,2);
-                String fInicio = matcherUltimos.group().substring(0, 4);
-                String fFin = matcherUltimos.group().substring(matcherUltimos.group().length()-4, matcherUltimos.group().length());
-                Query q35 = TermRangeQuery.newStringRange("date", fInicio, fFin, true, true);
+            }
+            else if(matcherUltimos.find()) {
+                Query queryTitulo = titleParser.parse(consulta);
+                BoostQuery queryTituloFin = new BoostQuery(queryTitulo,2);
+                Query querySubject = subjectParser.parse(consulta);
+                BoostQuery querySubjectFin = new BoostQuery(querySubject,1.5f);
+                Query queryDescription = descriptionParser.parse(consulta);
+                BoostQuery queryDescriptionFin = new BoostQuery(queryDescription,1);
+                String auxString = matcherUltimos.group();
+                auxString = auxString.replaceAll("últimos ", "");
+                auxString = auxString.replaceAll(" años", "");
+                Integer offset = Integer.parseInt(auxString);
+                Integer intFecha = 2018-offset;
+                String fInicio = intFecha.toString();
+                Query queryIntervalo = TermRangeQuery.newStringRange("date", fInicio, "2018", true, true);
                 query = new BooleanQuery.Builder()
-                        .add(query4, BooleanClause.Occur.SHOULD)
-                        .add(query3, BooleanClause.Occur.SHOULD)
-                        .add(q35, BooleanClause.Occur.MUST)
+                        .add(queryTituloFin, BooleanClause.Occur.SHOULD)
+                        .add(querySubjectFin, BooleanClause.Occur.SHOULD)
+                        .add(queryDescriptionFin, BooleanClause.Occur.SHOULD)
+                        .add(queryIntervalo, BooleanClause.Occur.MUST)
                         .build();
-            }else if(matcherIntervalo.find()) {
-
-                Query query2 = parser.parse(line);
-                BoostQuery query4 = new BoostQuery(query2,1);
-                BoostQuery query3 = new BoostQuery(query2,2);
-                String fInicio = matcherIntervalo.group().substring(0, 4);
-                String fFin = matcherIntervalo.group().substring(matcherIntervalo.group().length()-4, matcherIntervalo.group().length());
-                Query q35 = TermRangeQuery.newStringRange("date", fInicio, fFin, true, true);
+            }
+            else if(matcherNombre.find()) {
+                Query queryTitulo = titleParser.parse(consulta);
+                BoostQuery queryTituloFin = new BoostQuery(queryTitulo,2);
+                Query querySubject = subjectParser.parse(consulta);
+                BoostQuery querySubjectFin = new BoostQuery(querySubject,1.5f);
+                Query queryDescription = descriptionParser.parse(consulta);
+                BoostQuery queryDescriptionFin = new BoostQuery(queryDescription,1);
+                Query queryCreator = creatorParser.parse(matcherNombre.group());
                 query = new BooleanQuery.Builder()
-                        .add(query4, BooleanClause.Occur.SHOULD)
-                        .add(query3, BooleanClause.Occur.SHOULD)
-                        .add(q35, BooleanClause.Occur.MUST)
+                        .add(queryTituloFin, BooleanClause.Occur.SHOULD)
+                        .add(querySubjectFin, BooleanClause.Occur.SHOULD)
+                        .add(queryDescriptionFin, BooleanClause.Occur.SHOULD)
+                        .add(queryCreator, BooleanClause.Occur.MUST)
+                        .build();
+            }
+            else if(matcherGrado.find() && !matcherMaster.find()) {
+                Query queryTitulo = titleParser.parse(consulta);
+                BoostQuery queryTituloFin = new BoostQuery(queryTitulo,2);
+                Query querySubject = subjectParser.parse(consulta);
+                BoostQuery querySubjectFin = new BoostQuery(querySubject,1.5f);
+                Query queryDescription = descriptionParser.parse(consulta);
+                BoostQuery queryDescriptionFin = new BoostQuery(queryDescription,1);
+                Query queryTipo = typeParser.parse("info:eu-repo/semantics/bachelorThesis");
+
+                query = new BooleanQuery.Builder()
+                        .add(queryTituloFin, BooleanClause.Occur.SHOULD)
+                        .add(querySubjectFin, BooleanClause.Occur.SHOULD)
+                        .add(queryDescriptionFin, BooleanClause.Occur.SHOULD)
+                        .add(queryTipo, BooleanClause.Occur.MUST)
+                        .build();
+            }
+            else if(matcherMaster.find() && !matcherGrado.find()) {
+                Query queryTitulo = titleParser.parse(consulta);
+                BoostQuery queryTituloFin = new BoostQuery(queryTitulo,2);
+                Query querySubject = subjectParser.parse(consulta);
+                BoostQuery querySubjectFin = new BoostQuery(querySubject,1.5f);
+                Query queryDescription = descriptionParser.parse(consulta);
+                BoostQuery queryDescriptionFin = new BoostQuery(queryDescription,1);
+                Query queryTipo = typeParser.parse("info:eu-repo/semantics/masterThesis");
+                query = new BooleanQuery.Builder()
+                        .add(queryTituloFin, BooleanClause.Occur.SHOULD)
+                        .add(querySubjectFin, BooleanClause.Occur.SHOULD)
+                        .add(queryDescriptionFin, BooleanClause.Occur.SHOULD)
+                        .add(queryTipo, BooleanClause.Occur.MUST)
+                        .build();
+            }
+            else if(matcherMaster.find() && matcherGrado.find()) {
+                Query queryTitulo = titleParser.parse(consulta);
+                BoostQuery queryTituloFin = new BoostQuery(queryTitulo,2);
+                Query querySubject = subjectParser.parse(consulta);
+                BoostQuery querySubjectFin = new BoostQuery(querySubject,1.5f);
+                Query queryDescription = descriptionParser.parse(consulta);
+                BoostQuery queryDescriptionFin = new BoostQuery(queryDescription,1);
+                Query queryTipo = typeParser.parse("info:eu-repo/semantics/masterThesis");
+                Query queryTipo2 = typeParser.parse("info:eu-repo/semantics/bachelorThesis");
+                query = new BooleanQuery.Builder()
+                        .add(queryTituloFin, BooleanClause.Occur.SHOULD)
+                        .add(querySubjectFin, BooleanClause.Occur.SHOULD)
+                        .add(queryDescriptionFin, BooleanClause.Occur.SHOULD)
+                        .add(queryTipo, BooleanClause.Occur.MUST)
+                        .add(queryTipo2, BooleanClause.Occur.MUST)
                         .build();
             }
             else{
-                Query query2 = parser.parse(line);
-                BoostQuery query4 = new BoostQuery(query2,1);
-
-                BoostQuery query3 = new BoostQuery(query2,2);
+                Query queryTitulo = titleParser.parse(consulta);
+                BoostQuery queryTituloFin = new BoostQuery(queryTitulo,2);
+                Query querySubject = subjectParser.parse(consulta);
+                BoostQuery querySubjectFin = new BoostQuery(querySubject,1.5f);
+                Query queryDescription = descriptionParser.parse(consulta);
+                BoostQuery queryDescriptionFin = new BoostQuery(queryDescription,1);
                 query = new BooleanQuery.Builder()
-                        .add(query4, BooleanClause.Occur.SHOULD)
-                        .add(query3, BooleanClause.Occur.SHOULD)
+                        .add(queryTituloFin, BooleanClause.Occur.SHOULD)
+                        .add(querySubjectFin, BooleanClause.Occur.SHOULD)
+                        .add(queryDescriptionFin, BooleanClause.Occur.SHOULD)
                         .build();
             }
 
@@ -247,7 +296,7 @@ public class SearchFiles {
 //                        searcher, query, hitsPerPage, raw,  queries == null && queryString == null);
 //            }
 
-            //doPagingSearch(in, searcher, query, hitsPerPage, raw, queries == null && queryString == null);
+            doPagingSearch(out, searcher, query, identifier);
 
             if (queryString != null) {
                 break;
@@ -265,91 +314,103 @@ public class SearchFiles {
      * to fill 5 result pages. If the user wants to page beyond this limit, then the query
      * is executed another time and all hits are collected.
      */
-    public static void doPagingSearch(BufferedReader in, IndexSearcher searcher, Query query,
-                                      int hitsPerPage, boolean raw, boolean interactive) throws IOException {
+    public static void doPagingSearch(BufferedWriter bw, IndexSearcher searcher, Query query, String identifier) throws IOException {
 
         // Collect enough docs to show 5 pages
-        TopDocs results = searcher.search(query, 5 * hitsPerPage);
+        TopDocs results = searcher.search(query, 15000);
         ScoreDoc[] hits = results.scoreDocs;
 
         int numTotalHits = (int) results.totalHits;
         System.out.println(numTotalHits + " total matching documents");
 
-        int start = 0;
-        int end = Math.min(numTotalHits, hitsPerPage);
 
-        while (true) {
-            if (end > hits.length) {
-                System.out.println("Only results 1 - " + hits.length + " of " + numTotalHits + " total matching documents collected.");
-                System.out.println("Collect more (y/n) ?");
-                String line = in.readLine();
-                if (line.length() == 0 || line.charAt(0) == 'n') {
-                    break;
-                }
 
-                hits = searcher.search(query, numTotalHits).scoreDocs;
-            }
-
-            end = Math.min(hits.length, start + hitsPerPage);
-
-            for (int i = start; i < end; i++) {
-                if (raw) {                              // output raw format
-                    System.out.println("doc=" + hits[i].doc + " score=" + hits[i].score);
-                    continue;
-                }
-
-                Document doc = searcher.doc(hits[i].doc);
-                String path = doc.get("path");
-                if (path != null) {
-                    System.out.println((i + 1) + ". " + path);
-                } else {
-                    System.out.println((i + 1) + ". " + "No path for this document");
-                }
-
-            }
-
-            if (!interactive || end == 0) {
-                break;
-            }
-
-            if (numTotalHits >= end) {
-                boolean quit = false;
-                while (true) {
-                    System.out.print("Press ");
-                    if (start - hitsPerPage >= 0) {
-                        System.out.print("(p)revious page, ");
-                    }
-                    if (start + hitsPerPage < numTotalHits) {
-                        System.out.print("(n)ext page, ");
-                    }
-                    System.out.println("(q)uit or enter number to jump to a page.");
-
-                    String line = in.readLine();
-                    if (line.length() == 0 || line.charAt(0) == 'q') {
-                        quit = true;
-                        break;
-                    }
-                    if (line.charAt(0) == 'p') {
-                        start = Math.max(0, start - hitsPerPage);
-                        break;
-                    } else if (line.charAt(0) == 'n') {
-                        if (start + hitsPerPage < numTotalHits) {
-                            start += hitsPerPage;
-                        }
-                        break;
-                    } else {
-                        int page = Integer.parseInt(line);
-                        if ((page - 1) * hitsPerPage < numTotalHits) {
-                            start = (page - 1) * hitsPerPage;
-                            break;
-                        } else {
-                            System.out.println("No such page");
-                        }
-                    }
-                }
-                if (quit) break;
-                end = Math.min(numTotalHits, start + hitsPerPage);
+        for(int i=0; i < numTotalHits; i++){
+            Document doc = searcher.doc(hits[i].doc);
+            String path = doc.get("path");
+            path = path.replaceAll("recordsdc\\\\", "");
+            if (path != null) {
+                bw.write(identifier + "\t" + path + "\r\n");
+            } else {
+                System.out.println((i + 1) + ". " + "No path for this document");
             }
         }
+        System.out.println("FIN CONSULTA " + identifier);
+//        int start = 0;
+//        int end = Math.min(numTotalHits, hitsPerPage);
+//
+//        while (true) {
+//            if (end > hits.length) {
+//                System.out.println("Only results 1 - " + hits.length + " of " + numTotalHits + " total matching documents collected.");
+//                System.out.println("Collect more (y/n) ?");
+//                String line = in.readLine();
+//                if (line.length() == 0 || line.charAt(0) == 'n') {
+//                    break;
+//                }
+//
+//                hits = searcher.search(query, numTotalHits).scoreDocs;
+//            }
+//
+//            end = Math.min(hits.length, start + hitsPerPage);
+//
+//            for (int i = start; i < end; i++) {
+//                if (raw) {                              // output raw format
+//                    System.out.println("doc=" + hits[i].doc + " score=" + hits[i].score);
+//                    continue;
+//                }
+//
+//                Document doc = searcher.doc(hits[i].doc);
+//                String path = doc.get("path");
+//                if (path != null) {
+//                    System.out.println((i + 1) + ". " + path);
+//                } else {
+//                    System.out.println((i + 1) + ". " + "No path for this document");
+//                }
+//
+//            }
+//
+//            if (!interactive || end == 0) {
+//                break;
+//            }
+//
+//            if (numTotalHits >= end) {
+//                boolean quit = false;
+//                while (true) {
+//                    System.out.print("Press ");
+//                    if (start - hitsPerPage >= 0) {
+//                        System.out.print("(p)revious page, ");
+//                    }
+//                    if (start + hitsPerPage < numTotalHits) {
+//                        System.out.print("(n)ext page, ");
+//                    }
+//                    System.out.println("(q)uit or enter number to jump to a page.");
+//
+//                    String line = in.readLine();
+//                    if (line.length() == 0 || line.charAt(0) == 'q') {
+//                        quit = true;
+//                        break;
+//                    }
+//                    if (line.charAt(0) == 'p') {
+//                        start = Math.max(0, start - hitsPerPage);
+//                        break;
+//                    } else if (line.charAt(0) == 'n') {
+//                        if (start + hitsPerPage < numTotalHits) {
+//                            start += hitsPerPage;
+//                        }
+//                        break;
+//                    } else {
+//                        int page = Integer.parseInt(line);
+//                        if ((page - 1) * hitsPerPage < numTotalHits) {
+//                            start = (page - 1) * hitsPerPage;
+//                            break;
+//                        } else {
+//                            System.out.println("No such page");
+//                        }
+//                    }
+//                }
+//                if (quit) break;
+//                end = Math.min(numTotalHits, start + hitsPerPage);
+//            }
+//        }
     }
 }

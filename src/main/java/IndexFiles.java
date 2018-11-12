@@ -162,7 +162,6 @@ public class IndexFiles {
 
         }
 
-        System.out.println(result);
         return result.toString();
     }
 
