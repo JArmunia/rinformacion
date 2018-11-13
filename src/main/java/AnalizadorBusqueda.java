@@ -34,6 +34,7 @@ import org.apache.lucene.analysis.miscellaneous.SetKeywordMarkerFilter;
 import org.apache.lucene.analysis.snowball.SnowballFilter;
 import org.apache.lucene.analysis.standard.StandardFilter;
 import org.apache.lucene.analysis.standard.StandardTokenizer;
+import org.apache.lucene.search.spell.SpellChecker;
 import org.apache.lucene.util.IOUtils;
 
 /**
@@ -119,7 +120,6 @@ public final class AnalizadorBusqueda extends StopwordAnalyzerBase {
     @Override
     protected TokenStreamComponents createComponents(String fieldName) {
         final Tokenizer source = new StandardTokenizer();
-
         TokenStream result = new StandardFilter(source);
         result = new LowerCaseFilter(result);
         result = new ASCIIFoldingFilter(result);

@@ -37,19 +37,20 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 
 /**
- * Simple command-line based search demo.
+ * Programa que realiza la busqueda de las necesidades de informacion proporcionadas
  */
 public class SearchFiles {
 
     private SearchFiles() {
     }
 
-    /**
-     * Simple command-line based search demo.
-     */
+
     public static void main(String[] args) throws Exception {
         Map<String, String> consultas = new HashMap<>();
 
+        /**
+         * Analizamos los argumentos
+         */
         String usage =
                 "Usage:\tjava org.apache.lucene.demo.SearchFiles [-index dir] [-infoNeeds file] [-output file]\n\nSee http://lucene.apache.org/core/4_1_0/demo/ for details.";
         if (args.length > 0 && ("-h".equals(args[0]) || "-help".equals(args[0]) || args.length !=6)) {
@@ -78,6 +79,10 @@ public class SearchFiles {
             }
         }
 
+
+        /**
+         * Construimos el buscador, los analizadores y los queryparsers
+         */
         File fichero = new File(output);
         BufferedWriter out = new BufferedWriter(new FileWriter(fichero, false));
         IndexReader reader = DirectoryReader.open(FSDirectory.open(Paths.get(index)));
@@ -114,6 +119,9 @@ public class SearchFiles {
             consultas.put(identificador.getNodeValue(), texto.getNodeValue());
         }
 
+        /**
+         * Realizamos la busqueda para cada consulta
+         */
         for (Map.Entry<String, String> entry : consultas.entrySet()) {
 
             String consulta = entry.getValue();
@@ -196,7 +204,7 @@ public class SearchFiles {
                         .add(queryTituloFin, BooleanClause.Occur.SHOULD)
                         .add(querySubjectFin, BooleanClause.Occur.SHOULD)
                         .add(queryDescriptionFin, BooleanClause.Occur.SHOULD)
-                        .add(queryCreator, BooleanClause.Occur.MUST)
+                        .add(queryCreator, BooleanClause.Occur.SHOULD)
                         .build();
             } else if (matcherGrado.find() && !matcherMaster.find()) {
                 Query queryTitulo = titleParser.parse(consulta);
@@ -267,13 +275,7 @@ public class SearchFiles {
     }
 
     /**
-     * This demonstrates a typical paging search scenario, where the search engine presents
-     * pages of size n to the user. The user can then go to the next page if interested in
-     * the next hits.
-     * <p>
-     * When the query is executed for the first time, then only enough results are collected
-     * to fill 5 result pages. If the user wants to page beyond this limit, then the query
-     * is executed another time and all hits are collected.
+     * Recupera los resultados y los escribe en fichero
      */
     public static void doPagingSearch(BufferedWriter bw, IndexSearcher searcher, Query query, String identifier) throws IOException {
 

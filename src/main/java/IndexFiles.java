@@ -51,20 +51,19 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
 /**
- * Index all text files under a directory.
- * <p>
- * This is a command-line application demonstrating simple Lucene indexing.
- * Run it with no command-line arguments for usage information.
+ * Indexa los ficheros en el directorio proporcionado
  */
 public class IndexFiles {
 
     private IndexFiles() {
     }
 
-    /**
-     * Index all text files under a directory.
-     */
+
     public static void main(String[] args) {
+
+        /**
+         * Procesamos los argumentos
+         */
         String usage = "java org.apache.lucene.demo.IndexFiles"
                 + " [-index INDEX_PATH] [-docs DOCS_PATH] [-update]\n\n"
                 + "This indexes the documents in DOCS_PATH, creating a Lucene index"
@@ -93,6 +92,10 @@ public class IndexFiles {
             System.exit(1);
         }
 
+
+        /**
+         * Indexamos los ficheros en el directorio proporcionado
+         */
         Date start = new Date();
         try {
             System.out.println("Indexing to directory '" + indexPath + "'...");
@@ -116,23 +119,8 @@ public class IndexFiles {
                 iwc.setOpenMode(OpenMode.CREATE_OR_APPEND);
             }
 
-            // Optional: for better indexing performance, if you
-            // are indexing many documents, increase the RAM
-            // buffer.  But if you do this, increase the max heap
-            // size to the JVM (eg add -Xmx512m or -Xmx1g):
-            //
-            // iwc.setRAMBufferSizeMB(256.0);
-
             IndexWriter writer = new IndexWriter(dir, iwc);
             indexDocs(writer, docDir);
-
-            // NOTE: if you want to maximize search performance,
-            // you can optionally call forceMerge here.  This can be
-            // a terribly costly operation, so generally it's only
-            // worth it when your index is relatively static (ie
-            // you're done adding documents to it):
-            //
-            // writer.forceMerge(1);
 
             writer.close();
 
@@ -145,7 +133,12 @@ public class IndexFiles {
         }
     }
 
-
+    /**
+     * Metodo que nos devuelve el campo elegido del documento seleccionado
+     * @param parserXML
+     * @param etiqueta
+     * @return
+     */
     private static String obtenerEtiqueta(org.w3c.dom.Document parserXML, String etiqueta) {
         NodeList nl = parserXML.getElementsByTagName(etiqueta);
         StringBuffer result = new StringBuffer();
@@ -211,27 +204,11 @@ public class IndexFiles {
                     // make a new, empty document
                     Document doc = new Document();
 
-                    // Add the path of the file as a field named "path".  Use a
-                    // field that is indexed (i.e. searchable), but don't tokenize
-                    // the field into separate words and don't index term frequency
-                    // or positional information:
+                    /**
+                     * Añadimos los distintos campos del indice
+                     */
                     Field pathField = new StringField("path", file.getPath(), Field.Store.YES);
                     doc.add(pathField);
-
-                    // Add the last modified date of the file a field named "modified".
-                    // Use a LongField that is indexed (i.e. efficiently filterable with
-                    // NumericRangeFilter).  This indexes to milli-second resolution, which
-                    // is often too fine.  You could instead create a number based on
-                    // year/month/day/hour/minutes/seconds, down the resolution you require.
-                    // For example the long value 2011021714 would mean
-                    // February 17, 2011, 2-3 PM.
-                    //doc.add(new LongPoint("modified", file.lastModified()));
-
-                    // Add the contents of the file to a field named "contents".  Specify a Reader,
-                    // so that the text of the file is tokenized and indexed, but not stored.
-                    // Note that FileReader expects the file to be in UTF-8 encoding.
-                    // If that's not the case searching for special characters will fail.
-
 
                     doc.add(
                             new TextField(
